@@ -1,0 +1,24 @@
+{
+  "name": "brp-ts-popgen",
+  "version": "1.0.0",
+  "description": "Simple MATSim population & plans generator using Geneva's communting matrices",
+  "main": "index.js",
+  "scripts": {
+    "test": "test"
+  },
+  "bin": {
+    "generate-pop": "bin/index.js"
+  },
+  "author": "Sasha Poirier",
+  "license": "MIT",
+  "dependencies": {
+    "@turf/turf": "^5.1.6",
+    "axios": "^0.19.2",
+    "exceljs": "^4.1.1",
+    "object-to-xml": "^2.0.0",
+    "random-points-on-polygon": "0.0.4",
+    "read-excel-file": "^4.0.6",
+    "xml-writer": "^1.7.0",
+    "xmlbuilder": "^15.1.1"
+  }
+}

@@ -9,6 +9,11 @@ var transfrontaliersData = require('./data/transfrontaliers.js')
 var communespeupeuplees = require('./data/communespeupeuplees.js')
 var PopulationWriter = require('./lib/population-writer.js')
 
+var Probability = require('probability-node');
+
+var proportionOfDriversCH =0.5;
+var proportionOfDriversFR =0.5;
+
 function generateRandomMinute(){
     min = 0; max = 59;
     var minute = Math.round(Math.random() * (max - min) + min);
@@ -146,6 +151,8 @@ async function generatePopWPlans(probabilityReserve, includeTransfrontaliers, fi
         throw "Data Transfer Limit Exceeded!";
     }
 
+    // 1.5 : Handle different point encodings
+
     // 2 : Load Commune columns from Excel
     var fullpath = "D:/Files/Uni/Projet Bachelor/Population Generation/brp-ts-popgen/bin/data/T_11_06_2_10_cppfix.xlsx"
     var path = __dirname + "/data/T_11_06_2_10_cppfix.xlsx";
@@ -174,19 +181,6 @@ async function generatePopWPlans(probabilityReserve, includeTransfrontaliers, fi
 
             //Determine number of commuters
             var numberOfCommuters = getNumberOfCommuters(element);
-            /*var numberOfCommuters = undefined;
-            if(typeof element !== 'undefined' && element !== null) {
-                if(Number.isNaN(Number(element))){
-                    var test3 = element.slice(1, -1)
-                    //if(Number.isNaN(test3)){
-                    if(!Number.isNaN(Number(test3))){
-                        numberOfCommuters = Number(test3)
-                    }
-                } else {
-                    numberOfCommuters = Number(element)
-                }
-            }*/
-
             if(typeof numberOfCommuters !== 'undefined' && numberOfCommuters !== null && numberOfCommuters !== 0){
                 console.log(destinationCommuneNames[y] + " : " + numberOfCommuters)
 
@@ -194,7 +188,7 @@ async function generatePopWPlans(probabilityReserve, includeTransfrontaliers, fi
                 var destPoly = getCommunePolygon(destinationCommuneNames[y], communePolys)
 
                 if(typeof destPoly !== 'undefined' && destPoly !== null ){
-                    var numberOfDrivers = Math.floor(numberOfCommuters / 2)
+                    var numberOfDrivers = Math.floor(numberOfCommuters * proportionOfDriversCH)
 
                     var originPoints = randomPointsOnPolygon(numberOfDrivers, originPoly);
                     var destinationPoints = randomPointsOnPolygon(numberOfDrivers, destPoly);
@@ -203,12 +197,10 @@ async function generatePopWPlans(probabilityReserve, includeTransfrontaliers, fi
                     console.log("Calculating plans from " + communeName + " to " + destinationCommuneNames[y])
                     originPoints.forEach((element, index) => {
                         personIdCounter += 1;
-                        var personMode = randomlyChooseMode(probabilityReserve)
-    
                         PopulationWriter.writePersonAndPlan(
                             root, 
                             personIdCounter, 
-                            personMode, 
+                            randomlyChooseMode(probabilityReserve), 
                             element.geometry.coordinates, 
                             destinationPoints[index].geometry.coordinates,
                             randomWorkStartTime(),
@@ -226,7 +218,7 @@ async function generatePopWPlans(probabilityReserve, includeTransfrontaliers, fi
 
     //Handle transfrontaliers if asked
     if(includeTransfrontaliers){
-        await generatePlansTransfrontaliers(root)
+        await generatePlansTransfrontaliers(root, personIdCounter + 1)
     }
 
     //Write plans to file
@@ -239,13 +231,85 @@ async function generatePopWPlans(probabilityReserve, includeTransfrontaliers, fi
     console.log("Done!");
 }
 
+function resetCounters(counter){
+    counter.forEach(element => {
+        element.nombre = 0;
+    })
+}
+
 // P2 with transfrontaliers
-async function generatePlansTransfrontaliers(xmlFileRoot){
+async function generatePlansTransfrontaliers(xmlFileRoot, currentPersonId){
+    console.log("Starting to create plans for transfrontaliers!")
     var transfrontaliersRegionsQuery = await axios.get("https://ge.ch/sitgags3/rest/services/Hosted/GEO_COMMUNES_REGION/FeatureServer/0/query?where=pays%3D%27FRANCE%27&objectIds=&time=&geometry=&geometryType=esriGeometryEnvelope&inSR=&spatialRel=esriSpatialRelIntersects&distance=&units=esriSRUnit_Meter&relationParam=&outFields=&returnGeometry=true&maxAllowableOffset=&geometryPrecision=&outSR=&gdbVersion=&historicMoment=&returnDistinctValues=false&returnIdsOnly=false&returnCountOnly=false&returnExtentOnly=false&orderByFields=&groupByFieldsForStatistics=&outStatistics=&returnZ=false&returnM=false&multipatchOption=xyFootprint&resultOffset=&resultRecordCount=&returnTrueCurves=false&sqlFormat=none&resultType=&f=geojson")
 
-    transfrontaliersData
+    //Build circle around region
+    transfrontaliersData.transfrontaliersNumbers.forEach((element, index) => {
+        var circleOptions = {
+            steps: 64,
+            units: 'kilometers',
+            options: {}
+          };
+        var cfCircle = turf.circle(element.centre, element.radius, circleOptions);
+        element.circle = cfCircle;
+    })
+    console.log("Built transfrontalier areas")
+
+    //Build probabilities
+    var destinationZones = transfrontaliersData.destinationZoneChance;
+    var probabilities = [];
+    transfrontaliersData.destinationZoneChance.forEach((element, index) => {
+        probabilities.push({
+            p: element.chance / 100,
+            f: function () {
+                destinationZones.forEach((elementDZ, indexDZ) => {
+                    if(elementDZ.nom == element.nom){
+                        element.nombre = element.nombre + 1;
+                    }
+                })
+            }
+        })
+    })
+    var probabilitilized = new Probability(probabilities);
+    console.log(destinationZones)
+    console.log("Built probabilities")
+
+    //Build CH region (so no transfrontaliers created in CH)
+    var regionsSuisse = await axios.get("https://ge.ch/sitgags3/rest/services/Hosted/GEO_COMMUNES_CH_FR/FeatureServer/0/query?where=pays%3D%27CH%27+AND+%28numero_canton_ch%3D22+or+numero_canton_ch%3D23+or+numero_canton_ch%3D25%29&objectIds=&time=&geometry=&geometryType=esriGeometryEnvelope&inSR=&spatialRel=esriSpatialRelIntersects&distance=&units=esriSRUnit_Meter&relationParam=&outFields=&returnGeometry=true&maxAllowableOffset=&geometryPrecision=&outSR=&gdbVersion=&historicMoment=&returnDistinctValues=false&returnIdsOnly=false&returnCountOnly=false&returnExtentOnly=false&orderByFields=&groupByFieldsForStatistics=&outStatistics=&returnZ=false&returnM=false&multipatchOption=xyFootprint&resultOffset=&resultRecordCount=&returnTrueCurves=false&sqlFormat=none&resultType=&f=geojson");
+    var regionSuisse = turf.combine(regionsSuisse.data.features)
+    console.log("Built Switzerland areas")
+
+    //For each transfrontalier region
+    transfrontaliersData.transfrontaliersNumbers.forEach((element, index) => {
+        for (var i = 0; i < element.nombre; i++) {
+            probabilitilized();
+        }
+
+        var numberOfDrivers = Math.floor(element.nombre * proportionOfDriversFR);
+
+        var originPoints = randomPointsOnPolygon(numberOfDrivers, element.circle);
+        var destinationPoints = randomPointsOnPolygon(numberOfDrivers, destPoly);
+
+        originPoints.forEach((element) => {
+            currentPersonId += 1;
+            PopulationWriter.writePersonAndPlan(
+                xmlFileRoot, 
+                currentPersonId, 
+                randomlyChooseMode(probabilityReserve), 
+                element.geometry.coordinates, 
+                destinationPoints[index].geometry.coordinates,
+                randomWorkStartTime(),
+                randomWorkEndTime()
+            );
+        })
+        
+        resetCounters(destinationZones);
+    })
+
+    
+
+    console.log("Done creating plans for transfrontaliers!")
 }
 
 console.log("Generating population!")
 console.log("Will be writing results to: " + process.cwd() + "/")
-generatePopWPlans(0, false, "plansCPP.xml");
+generatePopWPlans(0, true, "plansCPP.xml");

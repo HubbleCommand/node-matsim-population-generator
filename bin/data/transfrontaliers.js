@@ -5,18 +5,34 @@ const transfrontaliersNumbers = [
     },
     {
         nom:"Gex",
+        centre:[
+            46.267999, 6.029362
+        ],
+        radius:8,
         nombre:27000
     },
     {
         nom:"Annemasse",
+        centre:[
+            46.197698, 6.273465
+        ],
+        radius: 7,
         nombre:18500
     },
     {
         nom:"Genevois",
+        centre:[
+            46.119756, 6.048240
+        ],
+        radius:6,
         nombre:13000
     },
     {
         nom:"Thonon",
+        centre:[
+            46.341950, 6.502898
+        ],
+        radius:10,
         nombre:130000
     }
 ]

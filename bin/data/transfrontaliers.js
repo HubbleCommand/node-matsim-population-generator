@@ -82,3 +82,4 @@ const destinationZoneChance = [
 ]
 
 exports.transfrontaliersNumbers = transfrontaliersNumbers
+exports.destinationZoneChance = destinationZoneChance

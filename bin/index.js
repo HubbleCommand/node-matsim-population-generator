@@ -1,21 +1,20 @@
 #!/usr/bin/env node
-
-const Excel = require('exceljs');
+var Excel = require('exceljs');
 var axios = require('axios');
-//import * as turf from '@turf/turf'
 var turf = require('@turf/turf')
 var randomPointsOnPolygon = require('random-points-on-polygon');
 var builder = require('xmlbuilder');
-const fs = require('fs');
-
-function generateRandomHour(min, max){
-    return Math.random() * (max - min) + min
-}
+var fs = require('fs');
+var transfrontaliersData = require('./data/transfrontaliers.js')
+var PopulationWriter = require('./lib/population-writer.js')
 
 function generateRandomMinute(){
-    min = 0;
-    max = 59;
-    return Math.random() * (max - min) + min
+    min = 0; max = 59;
+    var minute = Math.round(Math.random() * (max - min) + min);
+    if(minute < 10){
+        minute = "0" + minute
+    }
+    return minute;
 }
 
 function randomWorkStartTime(){
@@ -26,39 +25,12 @@ function randomWorkStartTime(){
     }
 }
 
-function randomWorkEndTimer(){
+function randomWorkEndTime(){
     if(Math.random() >= 0.9){
         return "18:00";
     } else {
         return "17:" + generateRandomMinute();
     }
-}
-//Not useful anymore, using numbers
-function oneBackAlphabet(string){
-    length = string.length;
-    if(length <= 0) {
-        return string;
-    } else if(length > 1){
-        str.substr(0,index) + chr
-    } else {
-        return String.fromCharCode(string.charAt(0).charCodeAt(0) - 1)
-    }
-}
-//Not useful anymore, using numbers
-const columnsOrigin = [
-    "C", "F", "I", "L", "O", "R", "U", "X", "AA", "AD", "AG", "AJ", "AM", "AP" 
-    //nord, oeust, sud, est (AS AV AY BB), 
-]
-//Not useful anymore, using numbers
-const columnsOriginData = [
-    "B", "E", "H", "K", "N", "Q", "T", "W", "Z", "AC", "AF", "AI", "AL", "AO" 
-    //nord, ouest, sub, est AR AU AX BA
-]
-
-//No longer need
-//The random point library also handles multipolygons
-function chooseRandomPolygon(polygons){
-    return polygons[Math.floor(Math.random() * polygons.length)];
 }
 
 function randomlyChooseMode(probabilityReserve){
@@ -67,6 +39,10 @@ function randomlyChooseMode(probabilityReserve){
     } else {
         return "car-reserve";
     }
+}
+
+function getNumberOfCommuters(){
+
 }
 
 function getCommunePolygon(communeName, polygons){
@@ -108,43 +84,18 @@ function getCommunePolygon(communeName, polygons){
             things.push(element.geometry.coordinates)
         })
         originPolygon = turf.multiPolygon(things, {name:communeName})
-
-        /*var regions = []
-        homeCommune.forEach(regionElement => {
-            console.log("Got here : ")
-            console.log(regionElement)
-            regions.push(regionElement.geometry.coordinates[0])
-        })
-
-        var fc = turf.featureCollection(regions);
-        var combined = turf.combine(fc);
-        originPolygon = combined*/
     } else {
         throw "No commune of this name found! No bueno!";
     }
-
-    /*if(originPolygon.features.length == 0){
-        throw "Geometry not created properly! No features for " + communeName + " !";
-    }*/
+    
     console.log("Generated Geometry!")
     //console.log(originPolygon)
     return originPolygon;
 }
 
-function generateRandomPoints(numberToGenerate, sourceGeometry){
-    if(sourceGeometry.geometry.type == "MultiPolygon"){
-        var points = [];
-
-
-
-    } else {
-        return randomPointsOnPolygon(numberToGenerate, sourceGeometry);
-    }
-}
-
 // P1 no transfrontaliers
 async function generatePopWPlans(probabilityReserve, includeTransfrontaliers, fileName){
-    // 0 : Define object to write to
+    // 0 : Define xml file to write to
     var personIdCounter = 0;
     var root = builder.create("plans");
     root.att("xml:lang", "de-CH")
@@ -157,22 +108,18 @@ async function generatePopWPlans(probabilityReserve, includeTransfrontaliers, fi
     } else {
         throw "Data Transfer Limit Exceeded!";
     }
-    
-    console.log(communePolysQuery)
-    console.log(communePolys)
 
     // 2 : Load Commune columns from Excel
     var fullpath = "D:/Files/Uni/Projet Bachelor/Population Generation/brp-ts-popgen/bin/data/T_11_06_2_10.xlsx"
-    var path = "./data/T_11_06_2_10.xlsx";
     const workbook = new Excel.Workbook();
     await workbook.xlsx.readFile(fullpath);
-    const worksheet = workbook.worksheets[0] //workbook.getWorksheet("2013-2017")
+    const worksheet = workbook.worksheets[0]
 
     destinationCommuneNames = worksheet.getColumn(1).values.slice(14, 28)
     console.log(destinationCommuneNames)
 
     //Get data by columns
-    //Foreach origin commune
+    //Foreach origin commune (column)
     for(var x = 3; x <= 42 /* 54 if include generlised areas */; x += 3){
         var communeName = worksheet.getColumn(x).values[8]
         console.log(communeName)
@@ -180,9 +127,12 @@ async function generatePopWPlans(probabilityReserve, includeTransfrontaliers, fi
         //Get commune polygon
         var originPoly = getCommunePolygon(communeName, communePolys)
 
-        //Foreach destination commune
+        //Foreach destination commune (row)
         communeValues = worksheet.getColumn(x - 1).values.slice(14, 28);
         for(var y = 0; y <= communeValues.length; y++){
+            //Handle the row that holds no data
+            //if(y=28) continue;
+
             var element = communeValues[y]
             //console.log(element)
             //Determine number of commuters
@@ -206,59 +156,25 @@ async function generatePopWPlans(probabilityReserve, includeTransfrontaliers, fi
                 var destPoly = getCommunePolygon(destinationCommuneNames[y], communePolys)
 
                 var numberOfDrivers = Math.floor(numberOfCommuters / 2)
-                if(numberOfDrivers > 500){
-                    numberOfDrivers = 500
-                }
 
                 var originPoints = randomPointsOnPolygon(numberOfDrivers, originPoly);
                 var destinationPoints = randomPointsOnPolygon(numberOfDrivers, destPoly);
-                //console.log(originPoints)
-
-                //var originPoints = generateRandomPoints(numberOfDrivers, originPoly);
-                //var destinationPoints = generateRandomPoints(numberOfDrivers, destPoly);
                 
                 // Create plans
                 console.log("Calculating plans from " + communeName + " to " + destinationCommuneNames[y])
                 originPoints.forEach((element, index) => {
                     personIdCounter += 1;
-                    var personeMode = randomlyChooseMode(probabilityReserve)
+                    var personMode = randomlyChooseMode(probabilityReserve)
 
-                    var homeX = element.geometry.coordinates[0]
-                    var homeY = element.geometry.coordinates[1]
-                    var workX = destinationPoints[index].geometry.coordinates[0]
-                    var workY = destinationPoints[index].geometry.coordinates[1]
-                    
-                    var person = root.ele("person");
-                    person.att("id", personIdCounter);
-                    var plan = person.ele("plan");
-
-                    var start = plan.ele("act")
-                    start.att("type", "h")
-                    start.att("x",homeX)
-                    start.att("y",homeY)
-                    start.att("end_time", "07:00")
-
-                    var legTo = plan.ele("leg")
-                    legTo.att("mode", personeMode)
-                    var routeTo = legTo.ele("route")
-                    //Doing .end() often DRASTICALLY INCREASES TIME
-                    //routeTo.end();
-
-                    var work = plan.ele("act")
-                    work.att("type", "w")
-                    work.att("x",workX)
-                    work.att("y",workY)
-                    work.att("duration", "08:00")
-
-                    var legBack = plan.ele("leg")
-                    legBack.att("mode", personeMode)
-                    var routeBack = legBack.ele("route")
-                    //routeBack.end();
-
-                    var end = plan.ele("act")
-                    end.att("type", "h")
-                    end.att("x",homeX)
-                    end.att("y",homeY)
+                    PopulationWriter.writePersonAndPlan(
+                        root, 
+                        personIdCounter, 
+                        personMode, 
+                        element.geometry.coordinates, 
+                        destinationPoints[index].geometry.coordinates,
+                        randomWorkStartTime(),
+                        randomWorkEndTime()
+                    );
                 })
             } else {
                 console.warn(destinationCommuneNames[y] + " : No commuters defined for this destination!")
@@ -274,28 +190,23 @@ async function generatePopWPlans(probabilityReserve, includeTransfrontaliers, fi
     //Write plans to file
     var xml = root.end({pretty: true});
 
-    //fs.writeFileSync('' + fileName, xml);
     fs.writeFile(process.cwd() + "/" + fileName, xml, (err) => {
-        // throws an error, you could also catch it here
         if (err) throw err;
-    
-        // success case, the file was saved
         console.log('Plans saved!');
     });
+    console.log("Done!");
+}
+
+async function handleLightlyPopulatedCommunes(xmlFileRoot){
+
 }
 
 // P2 with transfrontaliers
 async function generatePlansTransfrontaliers(xmlFileRoot){
     var transfrontaliersRegionsQuery = await axios.get("https://ge.ch/sitgags3/rest/services/Hosted/GEO_COMMUNES_REGION/FeatureServer/0/query?where=pays%3D%27FRANCE%27&objectIds=&time=&geometry=&geometryType=esriGeometryEnvelope&inSR=&spatialRel=esriSpatialRelIntersects&distance=&units=esriSRUnit_Meter&relationParam=&outFields=&returnGeometry=true&maxAllowableOffset=&geometryPrecision=&outSR=&gdbVersion=&historicMoment=&returnDistinctValues=false&returnIdsOnly=false&returnCountOnly=false&returnExtentOnly=false&orderByFields=&groupByFieldsForStatistics=&outStatistics=&returnZ=false&returnM=false&multipatchOption=xyFootprint&resultOffset=&resultRecordCount=&returnTrueCurves=false&sqlFormat=none&resultType=&f=geojson")
 
-    /*Not needed, filter done during query
-    var frenchRegions = transfrontaliersRegionsQuery.filter(obj => {
-        if(!Number.isNaN(Number(obj.properties.code_postal_fr))){
-            return obj;
-        }
-    })*/
+    transfrontaliersData
 }
 
 console.log("Hello world!")
 generatePopWPlans(0, false, "plans.xml");
-console.log("Done!");

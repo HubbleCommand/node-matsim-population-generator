@@ -6,6 +6,7 @@ var randomPointsOnPolygon = require('random-points-on-polygon');
 var builder = require('xmlbuilder');
 var fs = require('fs');
 var transfrontaliersData = require('./data/transfrontaliers.js')
+var communespeupeuplees = require('./data/communespeupeuplees.js')
 var PopulationWriter = require('./lib/population-writer.js')
 
 function generateRandomMinute(){
@@ -50,6 +51,30 @@ function getCommunePolygon(communeName, polygons){
     if(communeName == "Genève"){
         homeCommune = polygons.filter(obj => {
             if(obj.properties.commune.includes(communeName)){
+                return obj;
+            }
+        });
+    } else if(communeName == "Nord (6)") {
+        homeCommune = polygons.filter(obj => {
+            if(communespeupeuplees.communespeupeuplees.Nord.includes(obj.properties.commune)){
+                return obj;
+            }
+        });
+    } else if(communeName == "Ouest (7)") {
+        homeCommune = polygons.filter(obj => {
+            if(communespeupeuplees.communespeupeuplees.Ouest.includes(obj.properties.commune)){
+                return obj;
+            }
+        });
+    } else if(communeName == "Sud (8)") {
+        homeCommune = polygons.filter(obj => {
+            if(communespeupeuplees.communespeupeuplees.Sud.includes(obj.properties.commune)){
+                return obj;
+            }
+        });
+    } else if(communeName == "Est (9)") {
+        homeCommune = polygons.filter(obj => {
+            if(communespeupeuplees.communespeupeuplees.Est.includes(obj.properties.commune)){
                 return obj;
             }
         });
@@ -110,9 +135,10 @@ async function generatePopWPlans(probabilityReserve, includeTransfrontaliers, fi
     }
 
     // 2 : Load Commune columns from Excel
-    var fullpath = "D:/Files/Uni/Projet Bachelor/Population Generation/brp-ts-popgen/bin/data/T_11_06_2_10.xlsx"
+    var fullpath = "D:/Files/Uni/Projet Bachelor/Population Generation/brp-ts-popgen/bin/data/T_11_06_2_10_cppfix.xlsx"
+    var path = __dirname + "/data/T_11_06_2_10_cppfix.xlsx";
     const workbook = new Excel.Workbook();
-    await workbook.xlsx.readFile(fullpath);
+    await workbook.xlsx.readFile(path);
     const worksheet = workbook.worksheets[0]
 
     destinationCommuneNames = worksheet.getColumn(1).values.slice(14, 28)

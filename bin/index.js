@@ -1,19 +1,21 @@
 #!/usr/bin/env node
-var Excel = require('exceljs');
+var Excel = require('exceljs');                                             //https://www.npmjs.com/package/exceljs
 var axios = require('axios');
-var turf = require('@turf/turf')
-var randomPointsOnPolygon = require('random-points-on-polygon');
-var builder = require('xmlbuilder');
+var turf = require('@turf/turf');                                           //https://www.npmjs.com/package/@turf/turf
+var randomPointsOnPolygon = require('random-points-on-polygon');            //https://www.npmjs.com/package/random-points-on-polygon
+var builder = require('xmlbuilder');                                        //https://www.npmjs.com/package/xmlbuilder
 var fs = require('fs');
-var transfrontaliersData = require('./data/transfrontaliers.js')
-var communespeupeuplees = require('./data/communespeupeuplees.js')
-var PopulationWriter = require('./lib/population-writer.js')
+var transfrontaliersData = require('./data/transfrontaliers.js');
+var communespeupeuplees = require('./data/communespeupeuplees.js');
+var PopulationWriter = require('./lib/population-writer.js');       
+var Probability = require('probability-node');                              //https://www.javascripting.com/view/probability-js
 
-var Probability = require('probability-node');
+var proportionOfDriversCH = 0.5;
+var proportionOfDriversFR = 0.5;
 
-var proportionOfDriversCH =0.5;
-var proportionOfDriversFR =0.5;
+//Format of plans.xml is : http://www.matsim.org/files/dtd/plans_v4.dtd
 
+//Generates a random minute between 0 and 59
 function generateRandomMinute(){
     min = 0; max = 59;
     var minute = Math.round(Math.random() * (max - min) + min);
@@ -23,6 +25,7 @@ function generateRandomMinute(){
     return minute;
 }
 
+//Returns a random work start time between 8h and 9h
 function randomWorkStartTime(){
     if(Math.random() >= 0.9){
         return "09:00";
@@ -31,6 +34,7 @@ function randomWorkStartTime(){
     }
 }
 
+//Returns a random work end time between 17h and 18h
 function randomWorkEndTime(){
     if(Math.random() >= 0.9){
         return "18:00";
@@ -39,6 +43,12 @@ function randomWorkEndTime(){
     }
 }
 
+/**
+ * 
+ * @param {float} probabilityReserve 
+ */
+//Requires probably that reservation is used
+//Returns a randomly chosen mode
 function randomlyChooseMode(probabilityReserve){
     if(Math.random() >= probabilityReserve){
         return "car";
@@ -47,6 +57,13 @@ function randomlyChooseMode(probabilityReserve){
     }
 }
 
+/**
+ * 
+ * @param {string} communeName 
+ * @param {Array} polygons 
+ */
+//Requires the commune name to search for, and the list of polygons
+//Returns the polygon of the commune
 function getCommunePolygon(communeName, polygons){
     var homeCommune
     if(communeName == "Genève"){
@@ -119,6 +136,8 @@ function getCommunePolygon(communeName, polygons){
     return originPolygon;
 }
 
+//Requires the scel sheet element (look at use for details)
+//Returns the number of commuters for the element
 function getNumberOfCommuters(element){
     var numberOfCommuters = undefined;
     if(typeof element !== 'undefined' && element !== null) {
@@ -135,6 +154,28 @@ function getNumberOfCommuters(element){
     return numberOfCommuters;
 }
 
+//Requires the counter to reset
+//Returns the counters in the array
+function resetCounters(counter){
+    counter.forEach(element => {
+        element.nombre = 0;
+    })
+}
+
+async function getGenevaCommunes(){
+    var communePolysQuery = await axios.get("https://ge.ch/sitgags3/rest/services/Hosted/GEO_COMMUNES_GE_SIMPLIFIEES/FeatureServer/0/query?where=objectid>=0&objectIds=&time=&geometry=&geometryType=esriGeometryEnvelope&inSR=&spatialRel=esriSpatialRelIntersects&distance=&units=esriSRUnit_Meter&relationParam=&outFields=&returnGeometry=true&maxAllowableOffset=&geometryPrecision=&outSR=&gdbVersion=&historicMoment=&returnDistinctValues=false&returnIdsOnly=false&returnCountOnly=false&returnExtentOnly=false&orderByFields=&groupByFieldsForStatistics=&outStatistics&returnZ=false&returnM=false&multipatchOption=xyFootprint&resultOffset=&resultRecordCount=&returnTrueCurves=false&sqlFormat=none&resultType=&f=geojson")
+    if(! communePolysQuery.data.exceededTransferLimit){
+        return communePolysQuery.data.features
+    } else {
+        throw "Data Transfer Limit Exceeded!";
+    }
+}
+
+/* Requires :
+    the probability that a commuter will use reservation, 
+    whether or not to include transfrontaliers,
+    the file name to write to
+*/
 // P1 no transfrontaliers
 async function generatePopWPlans(probabilityReserve, includeTransfrontaliers, fileName){
     // 0 : Define xml file to write to
@@ -143,13 +184,7 @@ async function generatePopWPlans(probabilityReserve, includeTransfrontaliers, fi
     root.att("xml:lang", "de-CH")
 
     // 1 : Load Commune polygons
-    var communePolysQuery = await axios.get("https://ge.ch/sitgags3/rest/services/Hosted/GEO_COMMUNES_GE_SIMPLIFIEES/FeatureServer/0/query?where=objectid>=0&objectIds=&time=&geometry=&geometryType=esriGeometryEnvelope&inSR=&spatialRel=esriSpatialRelIntersects&distance=&units=esriSRUnit_Meter&relationParam=&outFields=&returnGeometry=true&maxAllowableOffset=&geometryPrecision=&outSR=&gdbVersion=&historicMoment=&returnDistinctValues=false&returnIdsOnly=false&returnCountOnly=false&returnExtentOnly=false&orderByFields=&groupByFieldsForStatistics=&outStatistics&returnZ=false&returnM=false&multipatchOption=xyFootprint&resultOffset=&resultRecordCount=&returnTrueCurves=false&sqlFormat=none&resultType=&f=geojson")
-    
-    if(! communePolysQuery.data.exceededTransferLimit){
-        communePolys = communePolysQuery.data.features
-    } else {
-        throw "Data Transfer Limit Exceeded!";
-    }
+    var communePolys = await getGenevaCommunes();
 
     // 1.5 : Handle different point encodings
 
@@ -231,16 +266,21 @@ async function generatePopWPlans(probabilityReserve, includeTransfrontaliers, fi
     console.log("Done!");
 }
 
-function resetCounters(counter){
-    counter.forEach(element => {
-        element.nombre = 0;
-    })
-}
-
+/**
+ * 
+ * @param {xmlBuilder root element} xmlFileRoot 
+ * @param {int} currentPersonId 
+ * @param {double} probabilityReserve 
+ */
 // P2 with transfrontaliers
 async function generatePlansTransfrontaliers(xmlFileRoot, currentPersonId, probabilityReserve){
     console.log("Starting to create plans for transfrontaliers!")
-    var transfrontaliersRegionsQuery = await axios.get("https://ge.ch/sitgags3/rest/services/Hosted/GEO_COMMUNES_REGION/FeatureServer/0/query?where=pays%3D%27FRANCE%27&objectIds=&time=&geometry=&geometryType=esriGeometryEnvelope&inSR=&spatialRel=esriSpatialRelIntersects&distance=&units=esriSRUnit_Meter&relationParam=&outFields=&returnGeometry=true&maxAllowableOffset=&geometryPrecision=&outSR=&gdbVersion=&historicMoment=&returnDistinctValues=false&returnIdsOnly=false&returnCountOnly=false&returnExtentOnly=false&orderByFields=&groupByFieldsForStatistics=&outStatistics=&returnZ=false&returnM=false&multipatchOption=xyFootprint&resultOffset=&resultRecordCount=&returnTrueCurves=false&sqlFormat=none&resultType=&f=geojson")
+    //var transfrontaliersRegionsQuery = await axios.get("https://ge.ch/sitgags3/rest/services/Hosted/GEO_COMMUNES_REGION/FeatureServer/0/query?where=pays%3D%27FRANCE%27&objectIds=&time=&geometry=&geometryType=esriGeometryEnvelope&inSR=&spatialRel=esriSpatialRelIntersects&distance=&units=esriSRUnit_Meter&relationParam=&outFields=&returnGeometry=true&maxAllowableOffset=&geometryPrecision=&outSR=&gdbVersion=&historicMoment=&returnDistinctValues=false&returnIdsOnly=false&returnCountOnly=false&returnExtentOnly=false&orderByFields=&groupByFieldsForStatistics=&outStatistics=&returnZ=false&returnM=false&multipatchOption=xyFootprint&resultOffset=&resultRecordCount=&returnTrueCurves=false&sqlFormat=none&resultType=&f=geojson")
+
+    //Build CH region (so no transfrontaliers created in CH)
+    //var regionsSuisse = await axios.get("https://ge.ch/sitgags3/rest/services/Hosted/GEO_COMMUNES_CH_FR/FeatureServer/0/query?where=pays%3D%27CH%27+AND+%28numero_canton_ch%3D22+or+numero_canton_ch%3D23+or+numero_canton_ch%3D25%29&objectIds=&time=&geometry=&geometryType=esriGeometryEnvelope&inSR=&spatialRel=esriSpatialRelIntersects&distance=&units=esriSRUnit_Meter&relationParam=&outFields=&returnGeometry=true&maxAllowableOffset=&geometryPrecision=&outSR=&gdbVersion=&historicMoment=&returnDistinctValues=false&returnIdsOnly=false&returnCountOnly=false&returnExtentOnly=false&orderByFields=&groupByFieldsForStatistics=&outStatistics=&returnZ=false&returnM=false&multipatchOption=xyFootprint&resultOffset=&resultRecordCount=&returnTrueCurves=false&sqlFormat=none&resultType=&f=geojson");
+    //var regionSuisse = turf.combine(regionsSuisse.data.features)
+    //console.log("Built Switzerland areas")
 
     //Build circle around region
     transfrontaliersData.transfrontaliersNumbers.forEach((element, index) => {
@@ -270,22 +310,11 @@ async function generatePlansTransfrontaliers(xmlFileRoot, currentPersonId, proba
         })
     })
     var probabilitilized = new Probability(probabilities);
-    console.log("Built probabilities")
-
-    //Build CH region (so no transfrontaliers created in CH)
-    var regionsSuisse = await axios.get("https://ge.ch/sitgags3/rest/services/Hosted/GEO_COMMUNES_CH_FR/FeatureServer/0/query?where=pays%3D%27CH%27+AND+%28numero_canton_ch%3D22+or+numero_canton_ch%3D23+or+numero_canton_ch%3D25%29&objectIds=&time=&geometry=&geometryType=esriGeometryEnvelope&inSR=&spatialRel=esriSpatialRelIntersects&distance=&units=esriSRUnit_Meter&relationParam=&outFields=&returnGeometry=true&maxAllowableOffset=&geometryPrecision=&outSR=&gdbVersion=&historicMoment=&returnDistinctValues=false&returnIdsOnly=false&returnCountOnly=false&returnExtentOnly=false&orderByFields=&groupByFieldsForStatistics=&outStatistics=&returnZ=false&returnM=false&multipatchOption=xyFootprint&resultOffset=&resultRecordCount=&returnTrueCurves=false&sqlFormat=none&resultType=&f=geojson");
-    var regionSuisse = turf.combine(regionsSuisse.data.features)
-    console.log("Built Switzerland areas")
+    console.log("Built probabilities");
 
     //Build CH communes
     // 1 : Load Commune polygons
-    var communePolysQuery = await axios.get("https://ge.ch/sitgags3/rest/services/Hosted/GEO_COMMUNES_GE_SIMPLIFIEES/FeatureServer/0/query?where=objectid>=0&objectIds=&time=&geometry=&geometryType=esriGeometryEnvelope&inSR=&spatialRel=esriSpatialRelIntersects&distance=&units=esriSRUnit_Meter&relationParam=&outFields=&returnGeometry=true&maxAllowableOffset=&geometryPrecision=&outSR=&gdbVersion=&historicMoment=&returnDistinctValues=false&returnIdsOnly=false&returnCountOnly=false&returnExtentOnly=false&orderByFields=&groupByFieldsForStatistics=&outStatistics&returnZ=false&returnM=false&multipatchOption=xyFootprint&resultOffset=&resultRecordCount=&returnTrueCurves=false&sqlFormat=none&resultType=&f=geojson")
-    
-    if(! communePolysQuery.data.exceededTransferLimit){
-        communePolys = communePolysQuery.data.features
-    } else {
-        throw "Data Transfer Limit Exceeded!";
-    }
+    var communePolys = await getGenevaCommunes();
 
     //For each transfrontalier region
     transfrontaliersData.transfrontaliersNumbers.forEach((element, index) => {
@@ -296,6 +325,7 @@ async function generatePlansTransfrontaliers(xmlFileRoot, currentPersonId, proba
 
         var originPoly = element.circle;
 
+        //For each destination commune in Geneva
         destinationZones.forEach(elementDZ => {
             var numberOfDrivers = Math.floor(elementDZ.nombre * proportionOfDriversFR);
 
@@ -304,6 +334,7 @@ async function generatePlansTransfrontaliers(xmlFileRoot, currentPersonId, proba
             var originPoints = randomPointsOnPolygon(numberOfDrivers, originPoly);
             var destinationPoints = randomPointsOnPolygon(numberOfDrivers, destPoly);
             
+            //For each randomly generated origin point, write person
             originPoints.forEach((elementOP, indexOP) => {
                 currentPersonId += 1;
                 PopulationWriter.writePersonAndPlan(

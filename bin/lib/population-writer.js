@@ -22,7 +22,7 @@ function writePersonAndPlan(xmlRootEle, personId, mode, homeXY, workXY, workStar
 
     writeActivity(plan, "h", homeXY[0], homeXY[1], null, null);
     writeLeg(plan, mode);
-    writeActivity(plan, "w", homeXY[0], homeXY[1], workStart, workEnd);
+    writeActivity(plan, "w", workXY[0], workXY[1], workStart, workEnd);
     writeLeg(plan, mode);
     writeActivity(plan, "h", homeXY[0], homeXY[1], null, null);
 }

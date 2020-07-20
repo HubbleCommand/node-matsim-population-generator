@@ -218,7 +218,7 @@ async function generatePopWPlans(probabilityReserve, includeTransfrontaliers, fi
 
     //Handle transfrontaliers if asked
     if(includeTransfrontaliers){
-        await generatePlansTransfrontaliers(root, personIdCounter + 1)
+        await generatePlansTransfrontaliers(root, personIdCounter + 1, probabilityReserve)
     }
 
     //Write plans to file
@@ -238,7 +238,7 @@ function resetCounters(counter){
 }
 
 // P2 with transfrontaliers
-async function generatePlansTransfrontaliers(xmlFileRoot, currentPersonId){
+async function generatePlansTransfrontaliers(xmlFileRoot, currentPersonId, probabilityReserve){
     console.log("Starting to create plans for transfrontaliers!")
     var transfrontaliersRegionsQuery = await axios.get("https://ge.ch/sitgags3/rest/services/Hosted/GEO_COMMUNES_REGION/FeatureServer/0/query?where=pays%3D%27FRANCE%27&objectIds=&time=&geometry=&geometryType=esriGeometryEnvelope&inSR=&spatialRel=esriSpatialRelIntersects&distance=&units=esriSRUnit_Meter&relationParam=&outFields=&returnGeometry=true&maxAllowableOffset=&geometryPrecision=&outSR=&gdbVersion=&historicMoment=&returnDistinctValues=false&returnIdsOnly=false&returnCountOnly=false&returnExtentOnly=false&orderByFields=&groupByFieldsForStatistics=&outStatistics=&returnZ=false&returnM=false&multipatchOption=xyFootprint&resultOffset=&resultRecordCount=&returnTrueCurves=false&sqlFormat=none&resultType=&f=geojson")
 
@@ -270,7 +270,6 @@ async function generatePlansTransfrontaliers(xmlFileRoot, currentPersonId){
         })
     })
     var probabilitilized = new Probability(probabilities);
-    console.log(destinationZones)
     console.log("Built probabilities")
 
     //Build CH region (so no transfrontaliers created in CH)
@@ -278,35 +277,48 @@ async function generatePlansTransfrontaliers(xmlFileRoot, currentPersonId){
     var regionSuisse = turf.combine(regionsSuisse.data.features)
     console.log("Built Switzerland areas")
 
+    //Build CH communes
+    // 1 : Load Commune polygons
+    var communePolysQuery = await axios.get("https://ge.ch/sitgags3/rest/services/Hosted/GEO_COMMUNES_GE_SIMPLIFIEES/FeatureServer/0/query?where=objectid>=0&objectIds=&time=&geometry=&geometryType=esriGeometryEnvelope&inSR=&spatialRel=esriSpatialRelIntersects&distance=&units=esriSRUnit_Meter&relationParam=&outFields=&returnGeometry=true&maxAllowableOffset=&geometryPrecision=&outSR=&gdbVersion=&historicMoment=&returnDistinctValues=false&returnIdsOnly=false&returnCountOnly=false&returnExtentOnly=false&orderByFields=&groupByFieldsForStatistics=&outStatistics&returnZ=false&returnM=false&multipatchOption=xyFootprint&resultOffset=&resultRecordCount=&returnTrueCurves=false&sqlFormat=none&resultType=&f=geojson")
+    
+    if(! communePolysQuery.data.exceededTransferLimit){
+        communePolys = communePolysQuery.data.features
+    } else {
+        throw "Data Transfer Limit Exceeded!";
+    }
+
     //For each transfrontalier region
     transfrontaliersData.transfrontaliersNumbers.forEach((element, index) => {
         for (var i = 0; i < element.nombre; i++) {
             probabilitilized();
         }
+        console.log(destinationZones)
 
-        var numberOfDrivers = Math.floor(element.nombre * proportionOfDriversFR);
+        var originPoly = element.circle;
 
-        var originPoints = randomPointsOnPolygon(numberOfDrivers, element.circle);
-        var destinationPoints = randomPointsOnPolygon(numberOfDrivers, destPoly);
+        destinationZones.forEach(elementDZ => {
+            var numberOfDrivers = Math.floor(elementDZ.nombre * proportionOfDriversFR);
 
-        originPoints.forEach((element) => {
-            currentPersonId += 1;
-            PopulationWriter.writePersonAndPlan(
-                xmlFileRoot, 
-                currentPersonId, 
-                randomlyChooseMode(probabilityReserve), 
-                element.geometry.coordinates, 
-                destinationPoints[index].geometry.coordinates,
-                randomWorkStartTime(),
-                randomWorkEndTime()
-            );
+            var destPoly = getCommunePolygon(elementDZ.nom, communePolys)
+
+            var originPoints = randomPointsOnPolygon(numberOfDrivers, originPoly);
+            var destinationPoints = randomPointsOnPolygon(numberOfDrivers, destPoly);
+            
+            originPoints.forEach((elementOP, indexOP) => {
+                currentPersonId += 1;
+                PopulationWriter.writePersonAndPlan(
+                    xmlFileRoot, 
+                    currentPersonId, 
+                    randomlyChooseMode(probabilityReserve), 
+                    elementOP.geometry.coordinates, 
+                    destinationPoints[indexOP].geometry.coordinates,
+                    randomWorkStartTime(),
+                    randomWorkEndTime()
+                );
+            })
         })
-        
         resetCounters(destinationZones);
     })
-
-    
-
     console.log("Done creating plans for transfrontaliers!")
 }
 

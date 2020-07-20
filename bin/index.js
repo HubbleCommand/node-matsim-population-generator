@@ -42,10 +42,6 @@ function randomlyChooseMode(probabilityReserve){
     }
 }
 
-function getNumberOfCommuters(){
-
-}
-
 function getCommunePolygon(communeName, polygons){
     var homeCommune
     if(communeName == "Genève"){
@@ -110,12 +106,28 @@ function getCommunePolygon(communeName, polygons){
         })
         originPolygon = turf.multiPolygon(things, {name:communeName})
     } else {
-        throw "No commune of this name found! No bueno!";
+        //throw "No commune of this name found! No bueno! Commune : " + communeName;
     }
     
     console.log("Generated Geometry!")
     //console.log(originPolygon)
     return originPolygon;
+}
+
+function getNumberOfCommuters(element){
+    var numberOfCommuters = undefined;
+    if(typeof element !== 'undefined' && element !== null) {
+        if(Number.isNaN(Number(element))){
+            var test3 = element.slice(1, -1)
+            //if(Number.isNaN(test3)){
+            if(!Number.isNaN(Number(test3))){
+                numberOfCommuters = Number(test3)
+            }
+        } else {
+            numberOfCommuters = Number(element)
+        }
+    }
+    return numberOfCommuters;
 }
 
 // P1 no transfrontaliers
@@ -146,7 +158,7 @@ async function generatePopWPlans(probabilityReserve, includeTransfrontaliers, fi
 
     //Get data by columns
     //Foreach origin commune (column)
-    for(var x = 3; x <= 42 /* 54 if include generlised areas */; x += 3){
+    for(var x = 3; x <= 54 /* 42 without communes peu peuplées, 54 with communes peu peuplées */; x += 3){
         var communeName = worksheet.getColumn(x).values[8]
         console.log(communeName)
 
@@ -154,15 +166,15 @@ async function generatePopWPlans(probabilityReserve, includeTransfrontaliers, fi
         var originPoly = getCommunePolygon(communeName, communePolys)
 
         //Foreach destination commune (row)
-        communeValues = worksheet.getColumn(x - 1).values.slice(14, 28);
+        /*28 for no communes peu peuplées, 32 for communes peu peuplées */
+        /* With reformatted, 28 is still for no communes peu peuples, but with CPP is 31 */
+        communeValues = worksheet.getColumn(x - 1).values.slice(14, 31 );
         for(var y = 0; y <= communeValues.length; y++){
-            //Handle the row that holds no data
-            //if(y=28) continue;
+            var element = communeValues[y];
 
-            var element = communeValues[y]
-            //console.log(element)
             //Determine number of commuters
-            var numberOfCommuters = undefined;
+            var numberOfCommuters = getNumberOfCommuters(element);
+            /*var numberOfCommuters = undefined;
             if(typeof element !== 'undefined' && element !== null) {
                 if(Number.isNaN(Number(element))){
                     var test3 = element.slice(1, -1)
@@ -173,7 +185,7 @@ async function generatePopWPlans(probabilityReserve, includeTransfrontaliers, fi
                 } else {
                     numberOfCommuters = Number(element)
                 }
-            }
+            }*/
 
             if(typeof numberOfCommuters !== 'undefined' && numberOfCommuters !== null && numberOfCommuters !== 0){
                 console.log(destinationCommuneNames[y] + " : " + numberOfCommuters)
@@ -181,29 +193,33 @@ async function generatePopWPlans(probabilityReserve, includeTransfrontaliers, fi
                 // Get destination commune polygon
                 var destPoly = getCommunePolygon(destinationCommuneNames[y], communePolys)
 
-                var numberOfDrivers = Math.floor(numberOfCommuters / 2)
+                if(typeof destPoly !== 'undefined' && destPoly !== null ){
+                    var numberOfDrivers = Math.floor(numberOfCommuters / 2)
 
-                var originPoints = randomPointsOnPolygon(numberOfDrivers, originPoly);
-                var destinationPoints = randomPointsOnPolygon(numberOfDrivers, destPoly);
-                
-                // Create plans
-                console.log("Calculating plans from " + communeName + " to " + destinationCommuneNames[y])
-                originPoints.forEach((element, index) => {
-                    personIdCounter += 1;
-                    var personMode = randomlyChooseMode(probabilityReserve)
-
-                    PopulationWriter.writePersonAndPlan(
-                        root, 
-                        personIdCounter, 
-                        personMode, 
-                        element.geometry.coordinates, 
-                        destinationPoints[index].geometry.coordinates,
-                        randomWorkStartTime(),
-                        randomWorkEndTime()
-                    );
-                })
+                    var originPoints = randomPointsOnPolygon(numberOfDrivers, originPoly);
+                    var destinationPoints = randomPointsOnPolygon(numberOfDrivers, destPoly);
+                    
+                    // Create plans
+                    console.log("Calculating plans from " + communeName + " to " + destinationCommuneNames[y])
+                    originPoints.forEach((element, index) => {
+                        personIdCounter += 1;
+                        var personMode = randomlyChooseMode(probabilityReserve)
+    
+                        PopulationWriter.writePersonAndPlan(
+                            root, 
+                            personIdCounter, 
+                            personMode, 
+                            element.geometry.coordinates, 
+                            destinationPoints[index].geometry.coordinates,
+                            randomWorkStartTime(),
+                            randomWorkEndTime()
+                        );
+                    })
+                } else {
+                    console.warn("No destination polygon is buildable for destination commune : " + destinationCommuneNames[y]);
+                }
             } else {
-                console.warn(destinationCommuneNames[y] + " : No commuters defined for this destination!")
+                console.warn("No commuters defined for this destination! Dest : " + destinationCommuneNames[y] + " Orig : " + communeName)
             }
         }
     }
@@ -223,10 +239,6 @@ async function generatePopWPlans(probabilityReserve, includeTransfrontaliers, fi
     console.log("Done!");
 }
 
-async function handleLightlyPopulatedCommunes(xmlFileRoot){
-
-}
-
 // P2 with transfrontaliers
 async function generatePlansTransfrontaliers(xmlFileRoot){
     var transfrontaliersRegionsQuery = await axios.get("https://ge.ch/sitgags3/rest/services/Hosted/GEO_COMMUNES_REGION/FeatureServer/0/query?where=pays%3D%27FRANCE%27&objectIds=&time=&geometry=&geometryType=esriGeometryEnvelope&inSR=&spatialRel=esriSpatialRelIntersects&distance=&units=esriSRUnit_Meter&relationParam=&outFields=&returnGeometry=true&maxAllowableOffset=&geometryPrecision=&outSR=&gdbVersion=&historicMoment=&returnDistinctValues=false&returnIdsOnly=false&returnCountOnly=false&returnExtentOnly=false&orderByFields=&groupByFieldsForStatistics=&outStatistics=&returnZ=false&returnM=false&multipatchOption=xyFootprint&resultOffset=&resultRecordCount=&returnTrueCurves=false&sqlFormat=none&resultType=&f=geojson")
@@ -234,5 +246,6 @@ async function generatePlansTransfrontaliers(xmlFileRoot){
     transfrontaliersData
 }
 
-console.log("Hello world!")
-generatePopWPlans(0, false, "plans.xml");
+console.log("Generating population!")
+console.log("Will be writing results to: " + process.cwd() + "/")
+generatePopWPlans(0, false, "plansCPP.xml");

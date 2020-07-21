@@ -8,7 +8,7 @@ function writeActivity(planXMLEle, activityType, X, Y, startTime, endTime){
     var activity = planXMLEle.ele("act");
     activity.att("type", activityType);
     activity.att("x", X);
-    activity.att("Y", Y);
+    activity.att("y", Y);
     if(activityType == 'w'){
         activity.att("start_time", startTime);
         activity.att("end_time", endTime);

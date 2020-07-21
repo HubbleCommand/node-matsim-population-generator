@@ -19,8 +19,10 @@ var CommuterDataWorker = require('./lib/commuter-data-worker.js');
 
 //Format of plans.xml is : http://www.matsim.org/files/dtd/plans_v4.dtd
 
-//Requires the counter to reset
-//Returns the counters in the array
+/**
+ * Resets the counters (needs to be done at the end of each probability counting)
+ * @param {Array<object>} counter   the array of counters to reset
+ */
 function resetCounters(counter){
     counter.forEach(element => {
         element.nombre = 0;
@@ -28,14 +30,13 @@ function resetCounters(counter){
 }
 
 /**
- * 
+ * Generates populations with plans, does not directly handle transfrontaliers
  * @param {double} probabilityReserve       the probability that a commuter will use reservation
  * @param {bool} includeTransfrontaliers    whether or not to include transfrontaliers
  * @param {string} fileName                 the file name to write to
  * @param {double} proportionOfDriversCH    the proportion of swiss  commuters that drive cars
  * @param {double} proportionOfDriversFR    the proportion of french commuters that drive cars
  */
-// P1 no transfrontaliers
 async function generatePopWPlans(probabilityReserve, includeTransfrontaliers, fileName, proportionOfDriversCH, proportionOfDriversFR){
     // 0 : Define xml file to write to
     var personIdCounter = 0;
@@ -125,13 +126,12 @@ async function generatePopWPlans(probabilityReserve, includeTransfrontaliers, fi
 }
 
 /**
- * 
+ * Calculate the populations and plans of transfrontaliers in the geneva region
  * @param {xmlBuilder root element} xmlFileRoot 
  * @param {int} currentPersonId 
  * @param {double} probabilityReserve 
  * @param {double} proportionOfDriversFR
  */
-// P2 with transfrontaliers
 async function generatePlansTransfrontaliers(xmlFileRoot, currentPersonId, probabilityReserve, proportionOfDriversFR){
     console.log("Starting to create plans for transfrontaliers!")
     //var transfrontaliersRegionsQuery = await axios.get("https://ge.ch/sitgags3/rest/services/Hosted/GEO_COMMUNES_REGION/FeatureServer/0/query?where=pays%3D%27FRANCE%27&objectIds=&time=&geometry=&geometryType=esriGeometryEnvelope&inSR=&spatialRel=esriSpatialRelIntersects&distance=&units=esriSRUnit_Meter&relationParam=&outFields=&returnGeometry=true&maxAllowableOffset=&geometryPrecision=&outSR=&gdbVersion=&historicMoment=&returnDistinctValues=false&returnIdsOnly=false&returnCountOnly=false&returnExtentOnly=false&orderByFields=&groupByFieldsForStatistics=&outStatistics=&returnZ=false&returnM=false&multipatchOption=xyFootprint&resultOffset=&resultRecordCount=&returnTrueCurves=false&sqlFormat=none&resultType=&f=geojson")

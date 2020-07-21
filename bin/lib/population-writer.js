@@ -7,14 +7,15 @@ function writeLeg(xmlPlanEle, mode){
 function writeActivity(planXMLEle, activityType, X, Y, startTime, endTime){
     var activity = planXMLEle.ele("act");
     activity.att("type", activityType);
-    activity.att("x", X);
-    activity.att("y", Y);
+    activity.att("x", X.toFixed(4));            //Flooring will 1: decrease file size, and 2: may fix runtime errors in MATSim
+    activity.att("y", Y.toFixed(4));
     if(activityType == 'w'){
         activity.att("start_time", startTime);
         activity.att("end_time", endTime);
     }
 }
 
+//Format of plans.xml is : http://www.matsim.org/files/dtd/plans_v4.dtd
 function writePersonAndPlan(xmlRootEle, personId, mode, homeXY, workXY, workStart, workEnd){
     var person = xmlRootEle.ele("person");
     person.att("id", personId);

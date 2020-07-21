@@ -4,155 +4,24 @@ var axios = require('axios');
 var turf = require('@turf/turf');                                           //https://www.npmjs.com/package/@turf/turf
 var randomPointsOnPolygon = require('random-points-on-polygon');            //https://www.npmjs.com/package/random-points-on-polygon
 var builder = require('xmlbuilder');                                        //https://www.npmjs.com/package/xmlbuilder
-var fs = require('fs');
-var transfrontaliersData = require('./data/transfrontaliers.js');
-var communespeupeuplees = require('./data/communespeupeuplees.js');
-var PopulationWriter = require('./lib/population-writer.js');       
+var fs = require('fs');     
 var Probability = require('probability-node');                              //https://www.javascripting.com/view/probability-js
 
+//Require own data
+var transfrontaliersData = require('./data/transfrontaliers.js');
+var communespeupeuplees = require('./data/communespeupeuplees.js');
+
+//Require own modules
+var PopulationWriter = require('./lib/population-writer.js');
+var PolyWorker = require('./lib/poly-worker.js');
+var TimeRandomizers = require('./lib/time-randomizers.js');
+var CommuterDataWorker = require('./lib/commuter-data-worker.js');
+
+//Global vars
 var proportionOfDriversCH = 0.5;
 var proportionOfDriversFR = 0.5;
 
 //Format of plans.xml is : http://www.matsim.org/files/dtd/plans_v4.dtd
-
-//Generates a random minute between 0 and 59
-function generateRandomMinute(){
-    min = 0; max = 59;
-    var minute = Math.round(Math.random() * (max - min) + min);
-    if(minute < 10){
-        minute = "0" + minute
-    }
-    return minute;
-}
-
-//Returns a random work start time between 8h and 9h
-function randomWorkStartTime(){
-    if(Math.random() >= 0.9){
-        return "09:00";
-    } else {
-        return "08:" + generateRandomMinute();
-    }
-}
-
-//Returns a random work end time between 17h and 18h
-function randomWorkEndTime(){
-    if(Math.random() >= 0.9){
-        return "18:00";
-    } else {
-        return "17:" + generateRandomMinute();
-    }
-}
-
-/**
- * 
- * @param {float} probabilityReserve 
- */
-//Requires probably that reservation is used
-//Returns a randomly chosen mode
-function randomlyChooseMode(probabilityReserve){
-    if(Math.random() >= probabilityReserve){
-        return "car";
-    } else {
-        return "car-reserve";
-    }
-}
-
-/**
- * 
- * @param {string} communeName 
- * @param {Array} polygons 
- */
-//Requires the commune name to search for, and the list of polygons
-//Returns the polygon of the commune
-function getCommunePolygon(communeName, polygons){
-    var homeCommune
-    if(communeName == "Genève"){
-        homeCommune = polygons.filter(obj => {
-            if(obj.properties.commune.includes(communeName)){
-                return obj;
-            }
-        });
-    } else if(communeName == "Nord (6)") {
-        homeCommune = polygons.filter(obj => {
-            if(communespeupeuplees.communespeupeuplees.Nord.includes(obj.properties.commune)){
-                return obj;
-            }
-        });
-    } else if(communeName == "Ouest (7)") {
-        homeCommune = polygons.filter(obj => {
-            if(communespeupeuplees.communespeupeuplees.Ouest.includes(obj.properties.commune)){
-                return obj;
-            }
-        });
-    } else if(communeName == "Sud (8)") {
-        homeCommune = polygons.filter(obj => {
-            if(communespeupeuplees.communespeupeuplees.Sud.includes(obj.properties.commune)){
-                return obj;
-            }
-        });
-    } else if(communeName == "Est (9)") {
-        homeCommune = polygons.filter(obj => {
-            if(communespeupeuplees.communespeupeuplees.Est.includes(obj.properties.commune)){
-                return obj;
-            }
-        });
-    } else {
-        homeCommune = polygons.filter(obj => {
-            if(obj.properties.commune == communeName){
-                return obj;
-            }
-        });
-    }
-    
-    originPolygon = null;
-    if(homeCommune.length == 1){
-        homeCommune = homeCommune[0]
-
-        if(homeCommune.geometry.type == "Polygon"){
-            originPolygon = turf.polygon(homeCommune.geometry.coordinates, {name:communeName})
-        } else if (homeCommune.geometry.type == "MultiPolygon") {
-            originPolygon = turf.multiPolygon(homeCommune.geometry.coordinates, {name:communeName})
-        } else {
-            throw "No geometry type defined for polygon!" + communeName
-        }
-
-    } else if (homeCommune.length > 1){
-        console.warn("Multiple communes found! No bueno! There are " + homeCommune.length + " regions")
-        if(communeName == "Genève"){
-            console.warn("Should be okay as is Geneva, but still, be carfeul")
-        }
-        //Combine things
-        things = []
-        homeCommune.forEach(element => {
-            things.push(element.geometry.coordinates)
-        })
-        originPolygon = turf.multiPolygon(things, {name:communeName})
-    } else {
-        //throw "No commune of this name found! No bueno! Commune : " + communeName;
-    }
-    
-    console.log("Generated Geometry!")
-    //console.log(originPolygon)
-    return originPolygon;
-}
-
-//Requires the scel sheet element (look at use for details)
-//Returns the number of commuters for the element
-function getNumberOfCommuters(element){
-    var numberOfCommuters = undefined;
-    if(typeof element !== 'undefined' && element !== null) {
-        if(Number.isNaN(Number(element))){
-            var test3 = element.slice(1, -1)
-            //if(Number.isNaN(test3)){
-            if(!Number.isNaN(Number(test3))){
-                numberOfCommuters = Number(test3)
-            }
-        } else {
-            numberOfCommuters = Number(element)
-        }
-    }
-    return numberOfCommuters;
-}
 
 //Requires the counter to reset
 //Returns the counters in the array
@@ -205,7 +74,7 @@ async function generatePopWPlans(probabilityReserve, includeTransfrontaliers, fi
         console.log(communeName)
 
         //Get commune polygon
-        var originPoly = getCommunePolygon(communeName, communePolys)
+        var originPoly = PolyWorker.getCommunePolygon(communeName, communePolys)
 
         //Foreach destination commune (row)
         /*28 for no communes peu peuplées, 32 for communes peu peuplées */
@@ -215,12 +84,12 @@ async function generatePopWPlans(probabilityReserve, includeTransfrontaliers, fi
             var element = communeValues[y];
 
             //Determine number of commuters
-            var numberOfCommuters = getNumberOfCommuters(element);
+            var numberOfCommuters = CommuterDataWorker.getNumberOfCommuters(element);
             if(typeof numberOfCommuters !== 'undefined' && numberOfCommuters !== null && numberOfCommuters !== 0){
                 console.log(destinationCommuneNames[y] + " : " + numberOfCommuters)
 
                 // Get destination commune polygon
-                var destPoly = getCommunePolygon(destinationCommuneNames[y], communePolys)
+                var destPoly = PolyWorker.getCommunePolygon(destinationCommuneNames[y], communePolys)
 
                 if(typeof destPoly !== 'undefined' && destPoly !== null ){
                     var numberOfDrivers = Math.floor(numberOfCommuters * proportionOfDriversCH)
@@ -235,11 +104,11 @@ async function generatePopWPlans(probabilityReserve, includeTransfrontaliers, fi
                         PopulationWriter.writePersonAndPlan(
                             root, 
                             personIdCounter, 
-                            randomlyChooseMode(probabilityReserve), 
+                            CommuterDataWorker.randomlyChooseMode(probabilityReserve), 
                             element.geometry.coordinates, 
                             destinationPoints[index].geometry.coordinates,
-                            randomWorkStartTime(),
-                            randomWorkEndTime()
+                            TimeRandomizers.randomWorkStartTime(),
+                            TimeRandomizers.randomWorkEndTime()
                         );
                     })
                 } else {
@@ -328,8 +197,7 @@ async function generatePlansTransfrontaliers(xmlFileRoot, currentPersonId, proba
         //For each destination commune in Geneva
         destinationZones.forEach(elementDZ => {
             var numberOfDrivers = Math.floor(elementDZ.nombre * proportionOfDriversFR);
-
-            var destPoly = getCommunePolygon(elementDZ.nom, communePolys)
+            var destPoly = PolyWorker.getCommunePolygon(elementDZ.nom, communePolys)
 
             var originPoints = randomPointsOnPolygon(numberOfDrivers, originPoly);
             var destinationPoints = randomPointsOnPolygon(numberOfDrivers, destPoly);
@@ -340,11 +208,11 @@ async function generatePlansTransfrontaliers(xmlFileRoot, currentPersonId, proba
                 PopulationWriter.writePersonAndPlan(
                     xmlFileRoot, 
                     currentPersonId, 
-                    randomlyChooseMode(probabilityReserve), 
+                    CommuterDataWorker.randomlyChooseMode(probabilityReserve), 
                     elementOP.geometry.coordinates, 
                     destinationPoints[indexOP].geometry.coordinates,
-                    randomWorkStartTime(),
-                    randomWorkEndTime()
+                    TimeRandomizers.randomWorkStartTime(),
+                    TimeRandomizers.randomWorkEndTime()
                 );
             })
         })
@@ -355,4 +223,4 @@ async function generatePlansTransfrontaliers(xmlFileRoot, currentPersonId, proba
 
 console.log("Generating population!")
 console.log("Will be writing results to: " + process.cwd() + "/")
-generatePopWPlans(0, true, "plansCPP.xml");
+generatePopWPlans(0, true, "plansCPPwTF.xml");

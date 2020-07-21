@@ -17,10 +17,6 @@ var PolyWorker = require('./lib/poly-worker.js');
 var TimeRandomizers = require('./lib/time-randomizers.js');
 var CommuterDataWorker = require('./lib/commuter-data-worker.js');
 
-//Global vars
-var proportionOfDriversCH = 0.5;
-var proportionOfDriversFR = 0.5;
-
 //Format of plans.xml is : http://www.matsim.org/files/dtd/plans_v4.dtd
 
 //Requires the counter to reset
@@ -31,34 +27,27 @@ function resetCounters(counter){
     })
 }
 
-async function getGenevaCommunes(){
-    var communePolysQuery = await axios.get("https://ge.ch/sitgags3/rest/services/Hosted/GEO_COMMUNES_GE_SIMPLIFIEES/FeatureServer/0/query?where=objectid>=0&objectIds=&time=&geometry=&geometryType=esriGeometryEnvelope&inSR=&spatialRel=esriSpatialRelIntersects&distance=&units=esriSRUnit_Meter&relationParam=&outFields=&returnGeometry=true&maxAllowableOffset=&geometryPrecision=&outSR=&gdbVersion=&historicMoment=&returnDistinctValues=false&returnIdsOnly=false&returnCountOnly=false&returnExtentOnly=false&orderByFields=&groupByFieldsForStatistics=&outStatistics&returnZ=false&returnM=false&multipatchOption=xyFootprint&resultOffset=&resultRecordCount=&returnTrueCurves=false&sqlFormat=none&resultType=&f=geojson")
-    if(! communePolysQuery.data.exceededTransferLimit){
-        return communePolysQuery.data.features
-    } else {
-        throw "Data Transfer Limit Exceeded!";
-    }
-}
-
-/* Requires :
-    the probability that a commuter will use reservation, 
-    whether or not to include transfrontaliers,
-    the file name to write to
-*/
+/**
+ * 
+ * @param {double} probabilityReserve       the probability that a commuter will use reservation
+ * @param {bool} includeTransfrontaliers    whether or not to include transfrontaliers
+ * @param {string} fileName                 the file name to write to
+ * @param {double} proportionOfDriversCH    the proportion of swiss  commuters that drive cars
+ * @param {double} proportionOfDriversFR    the proportion of french commuters that drive cars
+ */
 // P1 no transfrontaliers
-async function generatePopWPlans(probabilityReserve, includeTransfrontaliers, fileName){
+async function generatePopWPlans(probabilityReserve, includeTransfrontaliers, fileName, proportionOfDriversCH, proportionOfDriversFR){
     // 0 : Define xml file to write to
     var personIdCounter = 0;
-    var root = builder.create("plans");
+    var root = builder.create("plans", {
+        'sysID': 'http://www.matsim.org/files/dtd/plans_v4.dtd'
+    });
     root.att("xml:lang", "de-CH")
 
     // 1 : Load Commune polygons
-    var communePolys = await getGenevaCommunes();
-
-    // 1.5 : Handle different point encodings
+    var communePolys = await PolyWorker.getGenevaCommunes();
 
     // 2 : Load Commune columns from Excel
-    var fullpath = "D:/Files/Uni/Projet Bachelor/Population Generation/brp-ts-popgen/bin/data/T_11_06_2_10_cppfix.xlsx"
     var path = __dirname + "/data/T_11_06_2_10_cppfix.xlsx";
     const workbook = new Excel.Workbook();
     await workbook.xlsx.readFile(path);
@@ -122,7 +111,7 @@ async function generatePopWPlans(probabilityReserve, includeTransfrontaliers, fi
 
     //Handle transfrontaliers if asked
     if(includeTransfrontaliers){
-        await generatePlansTransfrontaliers(root, personIdCounter + 1, probabilityReserve)
+        await generatePlansTransfrontaliers(root, personIdCounter + 1, probabilityReserve, proportionOfDriversFR)
     }
 
     //Write plans to file
@@ -140,9 +129,10 @@ async function generatePopWPlans(probabilityReserve, includeTransfrontaliers, fi
  * @param {xmlBuilder root element} xmlFileRoot 
  * @param {int} currentPersonId 
  * @param {double} probabilityReserve 
+ * @param {double} proportionOfDriversFR
  */
 // P2 with transfrontaliers
-async function generatePlansTransfrontaliers(xmlFileRoot, currentPersonId, probabilityReserve){
+async function generatePlansTransfrontaliers(xmlFileRoot, currentPersonId, probabilityReserve, proportionOfDriversFR){
     console.log("Starting to create plans for transfrontaliers!")
     //var transfrontaliersRegionsQuery = await axios.get("https://ge.ch/sitgags3/rest/services/Hosted/GEO_COMMUNES_REGION/FeatureServer/0/query?where=pays%3D%27FRANCE%27&objectIds=&time=&geometry=&geometryType=esriGeometryEnvelope&inSR=&spatialRel=esriSpatialRelIntersects&distance=&units=esriSRUnit_Meter&relationParam=&outFields=&returnGeometry=true&maxAllowableOffset=&geometryPrecision=&outSR=&gdbVersion=&historicMoment=&returnDistinctValues=false&returnIdsOnly=false&returnCountOnly=false&returnExtentOnly=false&orderByFields=&groupByFieldsForStatistics=&outStatistics=&returnZ=false&returnM=false&multipatchOption=xyFootprint&resultOffset=&resultRecordCount=&returnTrueCurves=false&sqlFormat=none&resultType=&f=geojson")
 
@@ -153,13 +143,7 @@ async function generatePlansTransfrontaliers(xmlFileRoot, currentPersonId, proba
 
     //Build circle around region
     transfrontaliersData.transfrontaliersNumbers.forEach((element, index) => {
-        var circleOptions = {
-            steps: 64,
-            units: 'kilometers',
-            options: {}
-          };
-        var cfCircle = turf.circle(element.centre, element.radius, circleOptions);
-        element.circle = cfCircle;
+        element.circle = PolyWorker.createCircle(element);
     })
     console.log("Built transfrontalier areas")
 
@@ -183,7 +167,7 @@ async function generatePlansTransfrontaliers(xmlFileRoot, currentPersonId, proba
 
     //Build CH communes
     // 1 : Load Commune polygons
-    var communePolys = await getGenevaCommunes();
+    var communePolys = await PolyWorker.getGenevaCommunes();
 
     //For each transfrontalier region
     transfrontaliersData.transfrontaliersNumbers.forEach((element, index) => {
@@ -223,4 +207,4 @@ async function generatePlansTransfrontaliers(xmlFileRoot, currentPersonId, proba
 
 console.log("Generating population!")
 console.log("Will be writing results to: " + process.cwd() + "/")
-generatePopWPlans(0, true, "plansCPPwTF.xml");
+generatePopWPlans(0, true, "plansCPPwTF.xml", 0.5, 0.5);

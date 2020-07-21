@@ -1,6 +1,32 @@
 var turf = require('@turf/turf');                                           //https://www.npmjs.com/package/@turf/turf
-
+var axios = require('axios');
 var communespeupeuplees = require('../data/communespeupeuplees.js');
+
+/**
+ * @returns 
+ */
+async function getGenevaCommunes(){
+    var communePolysQuery = await axios.get("https://ge.ch/sitgags3/rest/services/Hosted/GEO_COMMUNES_GE_SIMPLIFIEES/FeatureServer/0/query?where=objectid>=0&objectIds=&time=&geometry=&geometryType=esriGeometryEnvelope&inSR=&spatialRel=esriSpatialRelIntersects&distance=&units=esriSRUnit_Meter&relationParam=&outFields=&returnGeometry=true&maxAllowableOffset=&geometryPrecision=&outSR=&gdbVersion=&historicMoment=&returnDistinctValues=false&returnIdsOnly=false&returnCountOnly=false&returnExtentOnly=false&orderByFields=&groupByFieldsForStatistics=&outStatistics&returnZ=false&returnM=false&multipatchOption=xyFootprint&resultOffset=&resultRecordCount=&returnTrueCurves=false&sqlFormat=none&resultType=&f=geojson")
+    if(! communePolysQuery.data.exceededTransferLimit){
+        return communePolysQuery.data.features
+    } else {
+        throw "Data Transfer Limit Exceeded!";
+    }
+}
+
+/**
+ * 
+ * @param {object} element 
+ */
+function createCircle(element){
+    var circleOptions = {
+        steps: 64,
+        units: 'kilometers',
+        options: {}
+      };
+    return turf.circle(element.centre, element.radius, circleOptions);
+}
+
 /**
  * 
  * @param {string} communeName 
@@ -80,4 +106,6 @@ function getCommunePolygon(communeName, polygons){
     return originPolygon;
 }
 
+exports.createCircle = createCircle;
 exports.getCommunePolygon = getCommunePolygon;
+exports.getGenevaCommunes = getGenevaCommunes;

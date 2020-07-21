@@ -1,10 +1,9 @@
 
 /**
- * 
- * @param {float} probabilityReserve 
+ * Returns a random mode
+ * @param {float} probabilityReserve    the probability that Reserve will be selected
+ * @returns {string}                    the mode
  */
-//Requires probably that reservation is used
-//Returns a randomly chosen mode
 function randomlyChooseMode(probabilityReserve){
     if(Math.random() >= probabilityReserve){
         return "car";
@@ -13,9 +12,11 @@ function randomlyChooseMode(probabilityReserve){
     }
 }
 
-
-//Requires the scel sheet element (look at use for details)
-//Returns the number of commuters for the element
+/**
+ * Returns the number of commuters for the element
+ * @param {string} element              the escel sheet element / cell (look at call examples)
+ * @returns {(number|undefined)}        the number that was parsed
+ */
 function getNumberOfCommuters(element){
     var numberOfCommuters = undefined;
     if(typeof element !== 'undefined' && element !== null) {

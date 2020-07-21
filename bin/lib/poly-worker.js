@@ -1,9 +1,10 @@
-var turf = require('@turf/turf');                                           //https://www.npmjs.com/package/@turf/turf
+var turf = require(`@turf/turf`);                                           //https://www.npmjs.com/package/@turf/turf
 var axios = require('axios');
 var communespeupeuplees = require('../data/communespeupeuplees.js');
 
 /**
- * @returns 
+ * Retrieves the communes of geneva
+ * @returns {object} the polygon / multipolygon data of geneva communes
  */
 async function getGenevaCommunes(){
     var communePolysQuery = await axios.get("https://ge.ch/sitgags3/rest/services/Hosted/GEO_COMMUNES_GE_SIMPLIFIEES/FeatureServer/0/query?where=objectid>=0&objectIds=&time=&geometry=&geometryType=esriGeometryEnvelope&inSR=&spatialRel=esriSpatialRelIntersects&distance=&units=esriSRUnit_Meter&relationParam=&outFields=&returnGeometry=true&maxAllowableOffset=&geometryPrecision=&outSR=&gdbVersion=&historicMoment=&returnDistinctValues=false&returnIdsOnly=false&returnCountOnly=false&returnExtentOnly=false&orderByFields=&groupByFieldsForStatistics=&outStatistics&returnZ=false&returnM=false&multipatchOption=xyFootprint&resultOffset=&resultRecordCount=&returnTrueCurves=false&sqlFormat=none&resultType=&f=geojson")
@@ -15,8 +16,9 @@ async function getGenevaCommunes(){
 }
 
 /**
- * 
+ * Creates a circle for the provided element
  * @param {object} element 
+ * @returns {turf.circle} a turf circle
  */
 function createCircle(element){
     var circleOptions = {
@@ -28,9 +30,10 @@ function createCircle(element){
 }
 
 /**
- * 
- * @param {string} communeName 
+ * Searches through the polygon data with the wanted commune name and returns a Turf feature of the commune
+ * @param {string} communeName the name of the commune to look for
  * @param {Array} polygons 
+ * @returns {turf.polygon|turf.multiPolygon|null))} a turf feature (polygon or multipolygon or null)
  */
 //Requires the commune name to search for, and the list of polygons
 //Returns the polygon of the commune

@@ -16,10 +16,15 @@ function generateRandomMinute(){
  * @returns {string} random time
  */
 function randomWorkStartTime(){
-    if(Math.random() >= 0.9){
+    /*if(Math.random() >= 0.9){
         return "09:00";
     } else {
         return "08:" + generateRandomMinute();
+    }*/
+    if(Math.random() >= 0.9){
+        return "08:00";
+    } else {
+        return "07:" + generateRandomMinute();
     }
 }
 

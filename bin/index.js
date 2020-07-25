@@ -207,4 +207,4 @@ async function generatePlansTransfrontaliers(xmlFileRoot, currentPersonId, proba
 
 console.log("Generating population!")
 console.log("Will be writing results to: " + process.cwd() + "/")
-generatePopWPlans(0, true, "plansCPPwTF.xml", 0.5, 0.5);
+generatePopWPlans(0, true, "plansCPPwTFCT.xml", 0.5, 0.5);

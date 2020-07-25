@@ -17,6 +17,7 @@
     "exceljs": "^4.1.1",
     "object-to-xml": "^2.0.0",
     "probability-node": "0.0.1",
+    "proj4": "^2.6.2",
     "random-points-on-polygon": "0.0.4",
     "read-excel-file": "^4.0.6",
     "xml-writer": "^1.7.0",

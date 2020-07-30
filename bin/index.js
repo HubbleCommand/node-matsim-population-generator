@@ -36,8 +36,9 @@ function resetCounters(counter){
  * @param {string} fileName                 the file name to write to
  * @param {double} proportionOfDriversCH    the proportion of swiss  commuters that drive cars
  * @param {double} proportionOfDriversFR    the proportion of french commuters that drive cars
+ * @param {double} populationFraction       the percentage of population to generate (10%, etc: 10% = 0.1, etc)
  */
-async function generatePopWPlans(probabilityReserve, includeTransfrontaliers, fileName, proportionOfDriversCH, proportionOfDriversFR){
+async function generatePopWPlans(probabilityReserve, includeTransfrontaliers, fileName, proportionOfDriversCH, proportionOfDriversFR, populationFraction){
     // 0 : Define xml file to write to
     var personIdCounter = 0;
     var root = builder.create("plans", {
@@ -82,13 +83,18 @@ async function generatePopWPlans(probabilityReserve, includeTransfrontaliers, fi
                 var destPoly = PolyWorker.getCommunePolygon(destinationCommuneNames[y], communePolys)
 
                 if(typeof destPoly !== 'undefined' && destPoly !== null ){
-                    var numberOfDrivers = Math.floor(numberOfCommuters * proportionOfDriversCH)
+                    var numberOfDrivers = Math.floor(numberOfCommuters * proportionOfDriversCH * populationFraction)
+
+                    if(numberOfDrivers < 1) {
+                        numberOfDrivers = 1;
+                    }
 
                     var originPoints = randomPointsOnPolygon(numberOfDrivers, originPoly);
                     var destinationPoints = randomPointsOnPolygon(numberOfDrivers, destPoly);
                     
                     // Create plans
                     console.log("Calculating plans from " + communeName + " to " + destinationCommuneNames[y])
+                    console.log(originPoints)
                     originPoints.forEach((element, index) => {
                         personIdCounter += 1;
                         PopulationWriter.writePersonAndPlan(
@@ -112,7 +118,7 @@ async function generatePopWPlans(probabilityReserve, includeTransfrontaliers, fi
 
     //Handle transfrontaliers if asked
     if(includeTransfrontaliers){
-        await generatePlansTransfrontaliers(root, personIdCounter + 1, probabilityReserve, proportionOfDriversFR)
+        await generatePlansTransfrontaliers(root, personIdCounter + 1, probabilityReserve, proportionOfDriversFR, populationFraction)
     }
 
     //Write plans to file
@@ -131,8 +137,9 @@ async function generatePopWPlans(probabilityReserve, includeTransfrontaliers, fi
  * @param {int} currentPersonId 
  * @param {double} probabilityReserve 
  * @param {double} proportionOfDriversFR
+ * @param {double} populationFraction       the percentage of population to generate (10%, etc: 10% = 0.1, etc)
  */
-async function generatePlansTransfrontaliers(xmlFileRoot, currentPersonId, probabilityReserve, proportionOfDriversFR){
+async function generatePlansTransfrontaliers(xmlFileRoot, currentPersonId, probabilityReserve, proportionOfDriversFR, populationFraction){
     console.log("Starting to create plans for transfrontaliers!")
     //var transfrontaliersRegionsQuery = await axios.get("https://ge.ch/sitgags3/rest/services/Hosted/GEO_COMMUNES_REGION/FeatureServer/0/query?where=pays%3D%27FRANCE%27&objectIds=&time=&geometry=&geometryType=esriGeometryEnvelope&inSR=&spatialRel=esriSpatialRelIntersects&distance=&units=esriSRUnit_Meter&relationParam=&outFields=&returnGeometry=true&maxAllowableOffset=&geometryPrecision=&outSR=&gdbVersion=&historicMoment=&returnDistinctValues=false&returnIdsOnly=false&returnCountOnly=false&returnExtentOnly=false&orderByFields=&groupByFieldsForStatistics=&outStatistics=&returnZ=false&returnM=false&multipatchOption=xyFootprint&resultOffset=&resultRecordCount=&returnTrueCurves=false&sqlFormat=none&resultType=&f=geojson")
 
@@ -180,7 +187,7 @@ async function generatePlansTransfrontaliers(xmlFileRoot, currentPersonId, proba
 
         //For each destination commune in Geneva
         destinationZones.forEach(elementDZ => {
-            var numberOfDrivers = Math.floor(elementDZ.nombre * proportionOfDriversFR);
+            var numberOfDrivers = Math.floor(elementDZ.nombre * proportionOfDriversFR * populationFraction);
             var destPoly = PolyWorker.getCommunePolygon(elementDZ.nom, communePolys)
 
             var originPoints = randomPointsOnPolygon(numberOfDrivers, originPoly);
@@ -207,4 +214,4 @@ async function generatePlansTransfrontaliers(xmlFileRoot, currentPersonId, proba
 
 console.log("Generating population!")
 console.log("Will be writing results to: " + process.cwd() + "/")
-generatePopWPlans(0, true, "plansCPPwTFCT.xml", 0.5, 0.5);
+generatePopWPlans(0, true, "plansCPPwTFCT_10pct.xml", 0.5, 0.5, 0.1);

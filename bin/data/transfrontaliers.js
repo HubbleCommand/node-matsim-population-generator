@@ -38,7 +38,8 @@ const transfrontaliersNumbers = [
             6.502898, 46.341950
         ],
         radius:10,
-        nombre:130000
+        //WARN this was the source of errors, was 10x too big! (130k instead of 13k)
+        nombre:13000
     }
 ]
 

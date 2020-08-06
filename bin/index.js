@@ -94,8 +94,8 @@ async function generatePopWPlans(probabilityReserve, includeTransfrontaliers, fi
                     
                     // Create plans
                     console.log("Calculating plans from " + communeName + " to " + destinationCommuneNames[y])
-                    console.log(originPoints)
                     originPoints.forEach((element, index) => {
+                        TimeRandomizers.randomWorkStartTimeDistanceDependant(element.geometry.coordinates, destinationPoints[index].geometry.coordinates)
                         personIdCounter += 1;
                         PopulationWriter.writePersonAndPlan(
                             root, 
@@ -124,10 +124,10 @@ async function generatePopWPlans(probabilityReserve, includeTransfrontaliers, fi
     //Write plans to file
     var xml = root.end({pretty: true});
 
-    fs.writeFile(process.cwd() + "/" + fileName, xml, (err) => {
+    /*fs.writeFile(process.cwd() + "/" + fileName, xml, (err) => {
         if (err) throw err;
         console.log('Plans saved!');
-    });
+    });*/
     console.log("Done!");
 }
 
@@ -195,6 +195,7 @@ async function generatePlansTransfrontaliers(xmlFileRoot, currentPersonId, proba
             
             //For each randomly generated origin point, write person
             originPoints.forEach((elementOP, indexOP) => {
+                TimeRandomizers.randomWorkStartTimeDistanceDependant(elementOP.geometry.coordinates, destinationPoints[indexOP].geometry.coordinates)
                 currentPersonId += 1;
                 PopulationWriter.writePersonAndPlan(
                     xmlFileRoot, 
@@ -214,4 +215,4 @@ async function generatePlansTransfrontaliers(xmlFileRoot, currentPersonId, proba
 
 console.log("Generating population!")
 console.log("Will be writing results to: " + process.cwd() + "/")
-generatePopWPlans(0, true, "plansCPPwTFCT_10pct.xml", 0.5, 0.5, 0.1);
+generatePopWPlans(0, true, "plansCPPwTFCT_100pct_fixed.xml", 0.5, 0.5, 1);

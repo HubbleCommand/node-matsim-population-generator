@@ -2,7 +2,11 @@
 
 Very simple "CLI" that generates a MATSim population with the data under ./data.
 
-# Using
+# Using Python
+
+Small bit of python code that allows you to take one of the outputs of the Node part, and then change the % of people using modes.
+
+# Using Node
 
 If you want to quickly use it from the command line, navigate a terminal into the directory with the package.json, and execture:
 

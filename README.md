@@ -2,6 +2,8 @@
 
 Very simple "CLI" that generates a MATSim population with the data under ./data.
 
+Generates population for the Grand Genève.
+
 # Using Python
 
 Small bit of python code that allows you to take one of the outputs of the Node part, and then change the % of people using modes.

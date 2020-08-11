@@ -89,8 +89,6 @@ function randomWorkStartTimeDistanceDependant(XYOrigin, XYDestination){
  */
 function randomWorkStartTimeDistanceDependantAdvanced(XYOrigin, XYDestination){
      //Use https://openrouteservice.org/dev/#/api-docs/directions/get
-     //HOly christ I can't even log into their service.
-    
 }
 
 exports.randomWorkStartTime = randomWorkStartTime

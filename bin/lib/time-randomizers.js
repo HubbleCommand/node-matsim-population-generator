@@ -87,11 +87,11 @@ function randomWorkStartTimeDistanceDependant(XYOrigin, XYDestination){
  * @param {*} XYDestination 
  * @returns random time based on the distance needed to trajet an actual route between the two points
  */
-function randomWorkStartTimeDistanceDependantAdvanced(XYOrigin, XYDestination){
+function randomWorkStartTimeRouteDependant(XYOrigin, XYDestination){
      //Use https://openrouteservice.org/dev/#/api-docs/directions/get
 }
 
 exports.randomWorkStartTime = randomWorkStartTime
 exports.randomWorkEndTime = randomWorkEndTime
 exports.randomWorkStartTimeDistanceDependant = randomWorkStartTimeDistanceDependant
-exports.randomWorkStartTimeDistanceDependantAdvanced = randomWorkStartTimeDistanceDependantAdvanced
+exports.randomWorkStartTimeRouteDependant = randomWorkStartTimeRouteDependant

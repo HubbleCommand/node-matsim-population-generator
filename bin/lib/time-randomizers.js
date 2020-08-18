@@ -45,8 +45,8 @@ function randomWorkEndTime(){
 function time_convert(num) { 
     var hours = Math.floor(num / 60);  
     var minutes = Math.floor(num % 60);
-    if(minute < 10){
-        minute = "0" + minute
+    if(minutes < 10){
+        minutes = "0" + minutes
     }
     return hours + ":" + minutes;         
 }

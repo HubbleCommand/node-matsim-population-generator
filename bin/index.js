@@ -124,10 +124,10 @@ async function generatePopWPlans(probabilityReserve, includeTransfrontaliers, fi
     //Write plans to file
     var xml = root.end({pretty: true});
 
-    /*fs.writeFile(process.cwd() + "/" + fileName, xml, (err) => {
+    fs.writeFile(process.cwd() + "/" + fileName, xml, (err) => {
         if (err) throw err;
         console.log('Plans saved!');
-    });*/
+    });
     console.log("Done!");
 }
 
@@ -215,4 +215,4 @@ async function generatePlansTransfrontaliers(xmlFileRoot, currentPersonId, proba
 
 console.log("Generating population!")
 console.log("Will be writing results to: " + process.cwd() + "/")
-generatePopWPlans(0, true, "plansCPPwTFCT_100pct_fixed.xml", 0.5, 0.5, 1);
+generatePopWPlans(0, true, "plansCPPwTFCT_10pct_fixed.xml", 0.5, 0.5, 0.2);

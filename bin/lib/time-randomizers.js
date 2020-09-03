@@ -77,7 +77,7 @@ function randomWorkStartTimeDistanceDependant(XYOrigin, XYDestination){
     var startTime = 480     //start at 8h = 480 minutes
     var randomFactor = (Math.random() < 0.5 ? -1 : 1) * (Math.random() * 10)    //Random factor, negative or positive
     var leaveTime = time_convert(startTime - randomFactor - (distance*2))       //Convert minutes to hours
-    console.log(leaveTime)
+    //console.log(leaveTime)
     return time_convert(leaveTime)
 }
 
